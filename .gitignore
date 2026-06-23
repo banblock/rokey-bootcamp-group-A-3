@@ -33,6 +33,4 @@ COLCON_IGNORE
 AMENT_IGNORE
 
 # End of https://www.toptal.com/developers/gitignore/api/ros2
-.vscode/browse.vc.db
-.vscode/*.db
-.vscode/*.ipch
+.vscode/
