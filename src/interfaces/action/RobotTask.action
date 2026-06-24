@@ -1,0 +1,13 @@
+# Goal
+
+int8 booksession
+
+---
+# Result
+bool success
+string message
+
+---
+# Feedback
+string current_step
+float32 progress
