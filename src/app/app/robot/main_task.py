@@ -21,19 +21,8 @@ try:
 except ImportError as e:
     print(f"Error importing DSR_ROBOT2 : {e}")
 
-ROBOT_ID = "dsr01"
-ROBOT_MODEL = "m0609"
 VELOCITY, ACC = 30, 30
-DR_init.__dsr__id = ROBOT_ID
-DR_init.__dsr__model = ROBOT_MODEL
-
-def main_task(args=None):
-    rclpy.init(args=args)
-    node = rclpy.create_node("rokey_move", namespace=ROBOT_ID)
-
-    DR_init.__dsr__node = node
-
-    
+def main_task():
 
     def reset(pos):
         movej(pos, vel=VELOCITY, acc=ACC)

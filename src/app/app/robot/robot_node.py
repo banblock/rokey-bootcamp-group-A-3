@@ -1,57 +1,51 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
+from main_task import main_task
+import DR_init
+from interfaces.action import RobotTask
+ROBOT_ID = "dsr01"
+ROBOT_MODEL = "m0609"
+DR_init.__dsr__id = ROBOT_ID
+DR_init.__dsr__model = ROBOT_MODEL
 
-class RobotActionSever(Node):
+from rclpy.node import Node
+from rclpy.action import ActionServer
+
+class RobotNode(Node):
     def __init__(self):
-        super().__init__('fibonacci_action_server')
+        super().__init__("my_node")
 
-        self._action_server = ActionServer(
+        self.action_server = ActionServer(
             self,
-            Action,
-            'fibonacci',
+            RobotTask,
+            "fibonacci",
             self.execute_callback
         )
 
-        self.get_logger().info('Fibonacci Action Server started')
-
     def execute_callback(self, goal_handle):
-        self.get_logger().info('Action goal received')
+        result = main_task(goal_handle)
+        if result.succeed:
+            goal_handle.succeed()
 
-        order = goal_handle.request.order
+            return result
+        else:
+            return result
 
-        feedback_msg = Action.Feedback()
-        feedback_msg.sequence = [0, 1]
 
-        for i in range(2, order):
-            feedback_msg.sequence.append(
-                feedback_msg.sequence[i - 1] + feedback_msg.sequence[i - 2]
-            )
+def main():
 
-            self.get_logger().info(f'Feedback: {feedback_msg.sequence}')
-            goal_handle.publish_feedback(feedback_msg)
+    rclpy.init()
 
-        goal_handle.succeed()
+    node = RobotNode()
+    DR_init.__dsr__node = node
 
-        result = Actoin.Result()
-        result.sequence = feedback_msg.sequence
-
-        self.get_logger().info('Action goal succeeded')
-
-        return result
-
-def main(args=None):
-    rclpy.init(args=args)
-
-    node = RobotActionSever()
-
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    rclpy.spin(node)
 
     node.destroy_node()
+
     rclpy.shutdown()
+
 
 
 if __name__ == '__main__':

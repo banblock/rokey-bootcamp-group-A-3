@@ -11,3 +11,4 @@ string message
 # Feedback
 string current_step
 float32 progress
+int32 state
