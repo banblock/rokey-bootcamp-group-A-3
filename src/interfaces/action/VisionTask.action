@@ -1,0 +1,12 @@
+int32 code
+
+---
+# Result
+bool success
+string message
+
+---
+# Feedback
+string current_state
+string QRinfo
+bool anomaly_detection

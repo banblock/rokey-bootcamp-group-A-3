@@ -1,6 +1,6 @@
 # Goal
 
-int8 booksession
+int32 booksession
 
 ---
 # Result
@@ -9,6 +9,6 @@ string message
 
 ---
 # Feedback
-string current_step
+string current_pos
 float32 progress
 int32 state
