@@ -1,9 +1,4 @@
 main_task ="""
-ROBOT_ID = "dsr01"
-ROBOT_MODEL = "m0609"
-
-DR_init.__dsr__id = ROBOT_ID
-DR_init.__dsr__model = ROBOT_MODEL
 VELOCITY, ACC = 30, 30
 OFF, ON = 0, 1
 velx, accx = (70, 70)
@@ -295,7 +290,6 @@ class BookRelease():
         # 실행
         # -------------------------
         
-        session = 0
         y, z = session_pos[session]
         release_sequence(y, z)
 

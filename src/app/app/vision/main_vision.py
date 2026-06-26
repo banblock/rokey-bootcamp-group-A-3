@@ -131,7 +131,7 @@ class BookVision:
             return
 
         self.process_qr_scanning_frame(frame)
-
+    
     def process_qr_scanning_frame(self, frame):
         """
         QR 확정 전 상태의 프레임 처리.

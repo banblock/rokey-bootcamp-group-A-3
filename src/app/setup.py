@@ -24,7 +24,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'app = app.app:main'
+            'app = app.app:main',
+            'controller = app.controll.controller_node:main',
+            'robot = app.robot.robot_node:main'
         ],
     },
 )
