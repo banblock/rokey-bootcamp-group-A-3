@@ -458,7 +458,7 @@ class BookVision:
         cv2.destroyAllWindows()
 
 
-BookVisionNode = BookVision
+# BookVisionNode = BookVision
 
 
 def main():

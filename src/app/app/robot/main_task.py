@@ -14,6 +14,7 @@ try:
         set_digital_output,
         wait,
         get_current_posx,
+        set_stiffnessx,
         DR_BASE, DR_FC_MOD_REL,
     )
 
@@ -22,48 +23,127 @@ except ImportError as e:
     print(f"Error importing DSR_ROBOT2 : {e}")
 
 VELOCITY, ACC = 30, 30
+ROBOT_ID = "dsr01"
+ROBOT_MODEL = "m0609"
+DR_init.__dsr__id = ROBOT_ID
+DR_init.__dsr__model = ROBOT_MODEL
+
+# -------------------------
+# 단순화 메서드
+# -------------------------
+
+def close_gripper():
+        set_digital_output(1, 0)
+        set_digital_output(2, 1)
+        wait(3)
+
+def open_gripper():
+    print("open")
+    set_digital_output(1, 1)
+    set_digital_output(2, 0)
+    wait(3)
+
+def move_joint(pos):
+    movej(pos, vel=VELOCITY, acc=ACC)
+
+def get_current_x():
+    return get_current_posx()[0]
+
+def make_relative_pos(origin, x=0, y=0, z=0):
+    return posx(
+        origin[0] + x,
+        origin[1] + y,
+        origin[2] + z,
+        origin[3],
+        origin[4],
+        origin[5],
+    )
+
+# -------------------------
+# 작업 단위 메서드
+# -------------------------
+
+def move_relative(x=0, y=0, z=0):
+    current = get_current_x()
+    target = make_relative_pos(current, x, y, z)
+    movel(target, vel=VELOCITY, acc=ACC)
+
+def compliance_drop():
+    # current = get_current_x()
+    # target = make_relative_pos(current, z=-25)
+    # movel(target, vel=VELOCITY, acc=ACC)
+    task_compliance_ctrl()
+    set_stiffnessx([200, 200, 20, 100, 100, 100], time=0.5)
+    fd = [0, 0, -10, 0, 0, 0]
+    fctrl_dir= [0, 0, 1, 0, 0, 0]
+    set_desired_force(fd, dir=fctrl_dir, mod=DR_BASE)
+    while True:
+        f = get_tool_force(DR_BASE)[2]
+        print(f)
+        if f > 3:
+            break
+    release_force()
+    wait(0.5)
+    r = release_compliance_ctrl()
+    if r == 0:
+        print("ok")
+    else:
+        print(r)
+
+def push_x(distance):
+    current = get_current_x()
+    current[0] += distance
+    movel(current, vel=VELOCITY, acc=ACC)
+    compliance_drop()
+    open_gripper()
+    current = get_current_x()
+    current[0] -= distance
+    movel(current, vel=VELOCITY, acc=ACC)
+
+def prepare_robot():
+    set_tool("Tool Weight1")
+    set_tcp("GripperDA_v2")
+
+
 def main_task():
 
-    def reset(pos):
-        movej(pos, vel=VELOCITY, acc=ACC)
+    # -------------------------
+    # 변수 정의
+    # -------------------------
 
-    def force_down():
-        force_d = [0,0,-20,0,0,0]
-        force_dir = [0,0,1,0,0,0]
-        task_compliance_ctrl([3000,3000,3000,200,200,200])
-        wait(0.5)
-        set_desired_force(force_d, dir=force_dir, mod=DR_FC_MOD_REL)
-        wait(0.5)
+    release_base = posj([0.0, 0.0, 90.0, 0.0, 90.0, 0.0])
+    release_readyj = posj([-6.000, 11.005, 90.003, -30.003, -14.998, -75.000])
 
-        while True:
-            f = get_tool_force(DR_BASE)[2]
-            print('in')
-            if f > 10:
-                break
-        
-        release_force()
-        wait(0.5)
-        release_compliance_ctrl()
-        wait(0.5)
+    session_pos = [
+        [163, 100],
+        [-153, 100],
+        [163, -265],
+        [-153, -265],
+    ]
+    # -------------------------
+    # sequence 정의
+    # -------------------------
 
-    def check_top():
-        set_digital_output(1,0)
-        set_digital_output(2,1)
-        wait(3)
-        force_down()
-        a = get_current_posx()[0]
-        a[2] += 10
-        movel(a,vel=VELOCITY, acc=ACC)
+    def release_sequence(session_y, session_z):
+        move_joint(release_base)
 
+        close_gripper()
 
+        move_joint(release_readyj)
 
-    set_tool("Tool Weight")
-    set_tcp("GripperDA_v1")
+        move_relative(y=session_y)
+        move_relative(z=session_z)
 
-    base = posj([0.0, 0.0, 90.0, 0.0, 90.0, 0.0])
-    grap_ready = posj([90.0, 0.0, 90.0, 0.0, 90.0, 0.0])
-    top_entry = posx([66.28, 44.16, 9.99, -0.34, 125.86, 65.98])
-    movej(base, vel=VELOCITY, acc=ACC)
-    reset(grap_ready, vel=VELOCITY, acc=ACC)
-    movel(top_entry)
-    check_top()
+        push_x(180)
+    # -------------------------
+    # 실행
+    # -------------------------
+
+    prepare_robot()
+
+    open_gripper()
+
+    for y, z in session_pos:
+        release_sequence(y, z)
+
+    move_joint(release_base)
