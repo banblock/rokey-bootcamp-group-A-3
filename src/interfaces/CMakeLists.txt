@@ -13,11 +13,8 @@ find_package(rosidl_default_generators REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/AnomalyDetection.msg"
-  "srv/RequestQR.srv"
-  "srv/ResetDetection.srv"
-  "srv/StartClear.srv"
-  "action/RobotTask.action"
+  "srv/UiErrorNotify.srv"
+  "srv/UiErrorResponse.srv"
 )
 
 ament_export_dependencies(rosidl_default_runtime)

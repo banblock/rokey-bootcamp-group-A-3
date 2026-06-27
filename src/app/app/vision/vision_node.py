@@ -32,7 +32,7 @@ class VisionNode(Node):
         print(msg.data)
 
     def qr_callback(self, request, response):
-
+        
         return response
 
     def reset_callback(self, request, response):

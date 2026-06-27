@@ -57,6 +57,21 @@ class ControllerNode(Node):
 
         # self.stop_code()
         
+
+        self.clear_response_server = self.create_service(
+
+        ) 
+
+
+        self.request_Qr = self.create_client(
+
+        )
+        while not self.request_Qr.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for service...')
+        
+        self.vision_anomaly_subs = self.create_subscription()
+        self.request_reset_vision = self.create_client()
+        self.request_reset_UI = self.create_client()
         
     def start_code(self, session):
         req = DrlStart.Request()
