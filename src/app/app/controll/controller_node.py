@@ -16,7 +16,7 @@ from dsr_msgs2.srv import (
     GetLastAlarm,
 )
 
-from interfaces.srv import UiErrorResponse, UiErrorNotify
+from interfaces.srv import UiErrorResponse, UiErrorNotify, UiBookInfo
 from app.robot import main_task
 
 
@@ -94,6 +94,7 @@ class ControllerNode(Node):
         # Controller -> UI
         self.ui_error_notify_cli = self.create_client(UiErrorNotify, "/ui/error_notify")
         self.ui_task_complete_cli = self.create_client(Trigger, "/ui/task_complite")
+        self.ui_current_data_cli = self.create_client(UiBookInfo, "/ui/book_info")
 
         # Controller -> Vision
         self.vision_qr_cli = self.create_client(Trigger, "/vision/scan_qr")
@@ -126,7 +127,8 @@ class ControllerNode(Node):
     def wait_for_ui_qr_services(self):
         clients = [
             self.ui_error_notify_cli,
-            self.vision_qr_cli
+            self.vision_qr_cli,
+            self.ui_current_data_cli
         ]
 
         for cli in clients:
@@ -230,9 +232,15 @@ class ControllerNode(Node):
             self.finish_all_tasks()
             return
         
+        req = DrlStart.Request()
+        req.key = res.message
+        future = self.ui_current_data_cli.call_async(req)
+        future.add_done_callback(self.send_book_info_ui)
+
         try:
             book_data = self.db_manager.get_book_by_qr(res.message)
         except Exception as e:
+            book_data = None
             self.notify_ui_error(ERR_DATA_NOT_FOUND, res.message)
             self.state = ControllerState.ERROR
             return
@@ -241,6 +249,19 @@ class ControllerNode(Node):
         self.current_session = int(book_data["target_location"]) - 1
 
         self.start_drl(self.current_session)
+
+    def send_book_info_ui(self, future):
+        try:
+            res = future.result()
+        except Exception as e:
+            print("can not send book info")
+            return
+
+        if not res.success:
+            print("can not send book info")
+            return
+
+        print("send book info successfully")
 
     def start_drl(self, session):
         req = DrlStart.Request()
