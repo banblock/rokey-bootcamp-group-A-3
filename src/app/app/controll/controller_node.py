@@ -38,6 +38,7 @@ ERR_ROBOT_SAFE_STOP = 1
 ERR_TASK_COLLISION_OR_MISS = 2
 ERR_EMERGENCY_STOP = 3
 ERR_DATA_NOT_FOUND = 4
+ERR_SYS_FAIL = 5
 
 STATE_SAFE_OFF = 3
 STATE_SAFE_STOP = 5
@@ -96,7 +97,6 @@ class ControllerNode(Node):
 
         # Controller -> Vision
         self.vision_qr_cli = self.create_client(Trigger, "/vision/scan_qr")
-        # self.vision_task_done_cli = self.create_client(Trigger, "/vision/task_done")
 
         self.wait_for_ui_qr_services()
         self.test_cli()
@@ -104,7 +104,7 @@ class ControllerNode(Node):
         self.create_subscription(Bool, "/vision/emergency_stop", self.handle_entry_obstacle, 10)
 
         # state check loop
-        # self.monitor_timer = self.create_timer(0.5, self.poll_dsr_state)
+        self.monitor_timer = self.create_timer(0.5, self.poll_dsr_state)
 
         self.get_logger().info("ControllerNode ready.")
 
@@ -127,7 +127,7 @@ class ControllerNode(Node):
     def wait_for_ui_qr_services(self):
         clients = [
             self.ui_error_notify_cli,
-            # self.vision_qr_cli
+            self.vision_qr_cli
         ]
 
         for cli in clients:
@@ -208,7 +208,7 @@ class ControllerNode(Node):
 
     def request_qr(self):
         if not self.vision_qr_cli.service_is_ready():
-            self.notify_ui_error(ERR_DATA_NOT_FOUND, "Vision QR service not ready")
+            self.notify_ui_error(ERR_SYS_FAIL, "Vision QR service not ready")
             self.state = ControllerState.ERROR
             return
 
@@ -219,12 +219,12 @@ class ControllerNode(Node):
         try:
             res = future.result()
         except Exception as e:
-            self.notify_ui_error(ERR_DATA_NOT_FOUND, f"QR request failed: {e}")
+            self.notify_ui_error(ERR_SYS_FAIL, f"QR request failed: {e}")
             self.state = ControllerState.ERROR
             return
 
         if not res.success:
-            self.notify_ui_error(ERR_DATA_NOT_FOUND, res.message)
+            self.notify_ui_error(ERR_SYS_FAIL, res.message)
             self.state = ControllerState.ERROR
             return
 
@@ -233,7 +233,14 @@ class ControllerNode(Node):
             return
         
         # 수정 필요. db 참조 session 가져오기
-        book_data = self.db_manager.get_book_by_qr(res.message)
+        try:
+            book_data = self.db_manager.get_book_by_qr(res.message)
+        except Exception as e:
+            self.notify_ui_error(ERR_DATA_NOT_FOUND, res.message)
+            self.state = ControllerState.ERROR
+            return
+        
+        
         self.current_session = book_data["target_location"]
 
         self.start_drl(self.current_session)
@@ -250,12 +257,12 @@ class ControllerNode(Node):
         try:
             res = future.result()
         except Exception as e:
-            self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, f"DRL start failed: {e}")
+            self.notify_ui_error(ERR_SYS_FAIL, f"DRL start failed: {e}")
             self.state = ControllerState.ERROR
             return
 
         if not res.success:
-            self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, "DRL start rejected")
+            self.notify_ui_error(ERR_SYS_FAIL, "DRL start rejected")
             self.state = ControllerState.ERROR
             return
 
@@ -299,12 +306,12 @@ class ControllerNode(Node):
         try:
             res = future.result()
         except Exception as e:
-            self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, f"Resume failed: {e}")
+            self.notify_ui_error(ERR_SYS_FAIL, f"Resume failed: {e}")
             self.state = ControllerState.ERROR
             return
 
         if not res.success:
-            self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, "Resume rejected")
+            self.notify_ui_error(ERR_SYS_FAIL, "Resume rejected")
             self.state = ControllerState.ERROR
             return
 
@@ -359,12 +366,12 @@ class ControllerNode(Node):
         try:
             res = future.result()
         except Exception as e:
-            self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, f"GetDrlState failed: {e}")
+            self.notify_ui_error(ERR_SYS_FAIL, f"GetDrlState failed: {e}")
             self.state = ControllerState.ERROR
             return
 
         if not res.success:
-            self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, "GetDrlState rejected")
+            self.notify_ui_error(ERR_SYS_FAIL, "GetDrlState rejected")
             self.state = ControllerState.ERROR
             return
 
@@ -518,18 +525,18 @@ class ControllerNode(Node):
 
 
     #test code
-    def test_cli(self):
-        #qr
-        # if not self.vision_qr_cli.service_is_ready():
-        #     self.notify_ui_error(ERR_DATA_NOT_FOUND, "Vision QR service not ready")
-        #     self.state = ControllerState.ERROR
-        #     return
+    # def test_cli(self):
+    #     #qr
+    #     # if not self.vision_qr_cli.service_is_ready():
+    #     #     self.notify_ui_error(ERR_DATA_NOT_FOUND, "Vision QR service not ready")
+    #     #     self.state = ControllerState.ERROR
+    #     #     return
 
-        # future_qr = self.vision_qr_cli.call_async(Trigger.Request())
-        # print(future_qr.message)
+    #     # future_qr = self.vision_qr_cli.call_async(Trigger.Request())
+    #     # print(future_qr.message)
 
-        #ui
-        self.notify_ui_error(ERR_ROBOT_SAFE_STOP, "GetRobotState rejected")
+    #     #ui
+    #     self.notify_ui_error(ERR_SYS_FAIL, "GetRobotState rejected")
 
 
         
