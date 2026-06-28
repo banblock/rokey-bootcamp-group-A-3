@@ -39,9 +39,6 @@ ERROR_RESPONSE_SERVICE_NAME = "/controller/error_response"
 UI_ERROR_NOTIFY_SERVICE_NAME = "/ui/error_notify"
 UI_TASK_COMPLETE_SERVICE_NAME = "/ui/task_complite"  # Controller 코드의 오타 이름 그대로 유지
 
-# Optional / existing DB lookup interface
-BOOK_DETECTED_SERVICE_NAME = "/book_detected"
-
 # Camera -> UI
 CAMERA_IMAGE_TOPIC_NAME = "/camera/image_raw"
 
@@ -49,10 +46,6 @@ CAMERA_IMAGE_TOPIC_NAME = "/camera/image_raw"
 CUSTOM_SRV_MODULE = "interfaces.srv"
 UI_ERROR_RESPONSE_SRV_CLASS = "UiErrorResponse"
 UI_ERROR_NOTIFY_SRV_CLASS = "UiErrorNotify"
-BOOK_DETECTED_SRV_CLASS = "BookDetected"
-
-# 기존 테스트 srv가 남아있는 환경에서도 최소한 실행되도록 하는 fallback
-LEGACY_CODE_COMMAND_SRV_CLASS = "CodeCommand"
 
 
 # ============================================================
@@ -71,27 +64,6 @@ def load_srv_type(class_name, *, quiet=False):
                 f"{CUSTOM_SRV_MODULE}.{class_name} / {e}"
             )
         return None
-
-
-def load_srv_type_with_fallback(primary_class_name, fallback_class_name=None):
-    srv_type = load_srv_type(primary_class_name)
-
-    if srv_type is not None:
-        return srv_type
-
-    if fallback_class_name is None:
-        return None
-
-    fallback_type = load_srv_type(fallback_class_name, quiet=True)
-
-    if fallback_type is not None:
-        print(
-            f"[UI_NODE] {primary_class_name}을 찾지 못해 "
-            f"{fallback_class_name}으로 임시 fallback합니다. "
-            f"컨트롤 코드와 통합할 때는 {primary_class_name}.srv 타입을 맞추는 것이 정석입니다."
-        )
-
-    return fallback_type
 
 
 class UISignalBridge(QObject):
@@ -128,15 +100,12 @@ class UINode(Node):
         self.exception_stop_signal = self.signal_bridge.exception_stop_signal
 
         # Custom service types
-        self.ui_error_response_srv_type = load_srv_type_with_fallback(
-            UI_ERROR_RESPONSE_SRV_CLASS,
-            LEGACY_CODE_COMMAND_SRV_CLASS
+        self.ui_error_response_srv_type = load_srv_type(
+            UI_ERROR_RESPONSE_SRV_CLASS
         )
-        self.ui_error_notify_srv_type = load_srv_type_with_fallback(
-            UI_ERROR_NOTIFY_SRV_CLASS,
-            LEGACY_CODE_COMMAND_SRV_CLASS
+        self.ui_error_notify_srv_type = load_srv_type(
+            UI_ERROR_NOTIFY_SRV_CLASS
         )
-        self.book_detected_srv_type = load_srv_type(BOOK_DETECTED_SRV_CLASS)
 
         # ====================================================
         # UI -> Controller service clients
@@ -180,18 +149,6 @@ class UINode(Node):
             self.ui_task_complete_service_callback
         )
 
-        # 기존 QR 인식 테스트/DB 연동용 서비스는 유지한다.
-        if self.book_detected_srv_type is not None:
-            self.create_service(
-                self.book_detected_srv_type,
-                BOOK_DETECTED_SERVICE_NAME,
-                self.book_detected_service_callback
-            )
-        else:
-            self.get_logger().warning(
-                "BookDetected srv 타입을 찾지 못했습니다. "
-                "QR 인식 DB 조회 서비스만 비활성화합니다."
-            )
 
         # ====================================================
         # Camera topic subscriber
@@ -408,39 +365,6 @@ class UINode(Node):
         response.message = "UI task complete accepted"
         return response
 
-    def book_detected_service_callback(self, request, response):
-        """
-        기존 테스트/QR 인식 연동용 도서 인식 알림.
-        request.qr_code 또는 request.book_id로 MongoDB를 조회한 뒤 UI에 표시한다.
-        """
-        qr_code = str(
-            getattr(request, "qr_code", "")
-            or getattr(request, "book_id", "")
-            or getattr(request, "data", "")
-            or ""
-        ).strip()
-
-        if not qr_code:
-            self.get_logger().warning("빈 qr_code를 수신했습니다.")
-            self.set_success_response(response, False, "빈 qr_code")
-            return response
-
-        book_doc = self.find_book_by_qr(qr_code)
-
-        if book_doc is None:
-            self.get_logger().warning(f"DB에서 도서 정보를 찾지 못했습니다: {qr_code}")
-
-            # 데이터 검색 불가
-            self.clear_book_signal.emit()
-            self.exception_stop_signal.emit(4)
-
-            self.set_success_response(response, False, "DB에서 도서 정보를 찾지 못했습니다.")
-            return response
-
-        self.book_info_signal.emit(book_doc)
-        self.set_success_response(response, True, "book detected accepted")
-        return response
-
     # ========================================================
     # Future/result helpers
     # ========================================================
@@ -481,80 +405,6 @@ class UINode(Node):
             response_callback,
             response_data
         )
-
-    # ========================================================
-    # DB lookup
-    # ========================================================
-    def find_book_by_qr(self, qr_code):
-        if self.db_manager is None:
-            self.get_logger().warning("DB manager가 연결되지 않았습니다.")
-            return None
-
-        method_names = [
-            "find_book_by_qr",
-            "find_book_by_qr_code",
-            "get_book_by_qr",
-            "get_book_by_qr_code",
-            "find_book_by_id",
-            "get_book_by_id",
-        ]
-
-        for method_name in method_names:
-            method = getattr(self.db_manager, method_name, None)
-
-            if method is None:
-                continue
-
-            try:
-                result = method(qr_code)
-
-                if result:
-                    return self.normalize_book_doc(result)
-
-            except Exception as e:
-                self.get_logger().warning(
-                    f"{method_name}({qr_code}) 조회 실패: {e}"
-                )
-
-        books = getattr(self.db_manager, "books", None)
-
-        if books is None:
-            return None
-
-        query_candidates = [
-            {"qr_code": qr_code},
-            {"book_id": qr_code},
-            {"qr_codes": qr_code},
-            {"qr_codes": {"$in": [qr_code]}},
-        ]
-
-        for query in query_candidates:
-            try:
-                result = books.find_one(query)
-
-                if result:
-                    return self.normalize_book_doc(result)
-
-            except Exception as e:
-                self.get_logger().warning(
-                    f"MongoDB 조회 실패 query={query}: {e}"
-                )
-
-        return None
-
-    def normalize_book_doc(self, book_doc):
-        if not isinstance(book_doc, dict):
-            return book_doc
-
-        doc = dict(book_doc)
-
-        if "_id" in doc:
-            doc["_id"] = str(doc["_id"])
-
-        if "qr_code" not in doc and "book_id" in doc:
-            doc["qr_code"] = doc["book_id"]
-
-        return doc
 
     # ========================================================
     # Common helpers

@@ -1185,20 +1185,3 @@ def show_ui(ui_node=None, db_manager=None):
     app, main_win = create_ui(ui_node, db_manager)
     return app.exec()
 
-
-def main(args=None):
-    try:
-        from ui_test.db_manager import BookDatabaseManager
-        db_manager = BookDatabaseManager()
-    except Exception:
-        try:
-            from db_manager import BookDatabaseManager
-            db_manager = BookDatabaseManager()
-        except Exception:
-            db_manager = None
-
-    show_ui(db_manager=db_manager)
-
-
-if __name__ == "__main__":
-    main()
