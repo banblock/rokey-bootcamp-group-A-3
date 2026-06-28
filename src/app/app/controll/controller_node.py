@@ -233,7 +233,7 @@ class ControllerNode(Node):
             return
         
         req = UiBookInfo.Request()
-        req.key = res.message
+        req.key = int(res.message)
         future = self.ui_current_data_cli.call_async(req)
         future.add_done_callback(self.send_book_info_ui)
 
