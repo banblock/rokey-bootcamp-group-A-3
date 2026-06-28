@@ -20,7 +20,7 @@ class BookVision:
 
     def __init__(
         self,
-        camera_index=2,
+        camera_index=3,
         on_qr_confirmed=None,
         on_status=None,
         on_stop_required=None,
