@@ -1,60 +1,138 @@
-# NoSQL/db_manager.py
+# app/db/db_manager.py
 import datetime
-import random
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING, DESCENDING
+
 
 class BookDatabaseManager:
     def __init__(self, db_url="mongodb://localhost:27017/", db_name="book_binder_db"):
         """MongoDB 연결 초기화"""
+        self.client = None
+        self.db = None
+        self.books = None
+
         try:
             self.client = MongoClient(db_url, serverSelectionTimeoutMS=2000)
+            self.client.admin.command("ping")
+
             self.db = self.client[db_name]
             self.books = self.db["books"]
+
+            # 숫자 기반 ID/QR 중복 방지
+            self.books.create_index([("book_id", ASCENDING)], unique=True)
+            self.books.create_index([("qr_code", ASCENDING)], unique=True, sparse=True)
+            self.books.create_index([("target_location", ASCENDING)])
+
             print(f"✔ [DB] '{db_name}' 데이터베이스에 연결되었습니다.")
+
         except Exception as e:
             print(f"❌ [DB] 연결 실패: {e}")
+            self.client = None
+            self.db = None
             self.books = None
 
-    def insert_new_book(self, title, width, length, thickness, weight):
+    def _generate_next_book_id(self):
         """
-        [기능 1: 새 책 정보 저장]
-        시스템 컨트롤단이 던져준 책의 제목과 물리적 스펙을 기반으로 
-        고유 QR 키(book_id)와 목표 분류 위치를 자동 매핑하여 MongoDB에 적재합니다.
+        숫자형 book_id를 1부터 자동 증가시킨다.
+        기존 문자열 book_id 문서는 무시한다.
         """
-        if self.books is None: return None
+        if self.books is None:
+            return 1
 
-        # QR 코드로 인쇄 및 인식될 고유 키값 생성
-        book_id = f"BOOK_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-        target_location = random.randint(0,3)
+        last_doc = self.books.find_one(
+            {"book_id": {"$type": "number"}},
+            {"book_id": 1, "_id": 0},
+            sort=[("book_id", DESCENDING)]
+        )
 
-        book_document = {
-            "book_id": book_id,            # QR 키값
-            "title": title,                # 책 제목
-            "dimensions": {                # 크기
-                "width": float(width),
-                "length": float(length),
-                "thickness": float(thickness)
-            },
-            "weight": int(weight),         # 무게
-            "target_location": target_location, # 목표 매핑 위치
-            "registered_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        if not last_doc:
+            return 1
+
+        return int(last_doc.get("book_id", 0)) + 1
+
+    def insert_new_book(self, title, width, length, thickness, section):
+        """
+        새 책 정보 저장.
+
+        저장 형식:
+            book_id: int
+            qr_code: int
+            target_location: int
+            dimensions.width/length/thickness: float, mm 단위
+
+        UI 쪽 호출 형식:
+            insert_new_book(title, width, length, thickness, section)
+        """
+        if self.books is None:
+            return None
 
         try:
+            book_id = self._generate_next_book_id()
+            target_location = int(section)
+
+            book_document = {
+                "book_id": int(book_id),
+                "qr_code": int(book_id),
+                "title": str(title),
+                "dimensions": {
+                    "width": float(width),
+                    "length": float(length),
+                    "thickness": float(thickness),
+                },
+                "target_location": int(target_location),
+                "registered_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+
             self.books.insert_one(book_document)
-            print(f"📁 [DB] 신규 도서 적재 완료 (QR Key: {book_id})")
-            return book_document  # 생성된 정보를 리턴하여 컨트롤단이 인쇄 등으로 활용할 수 있게 함
+
+            # UI/Controller에서 _id 직렬화 문제 없도록 제거해서 반환
+            book_document.pop("_id", None)
+
+            print(
+                f"📁 [DB] 신규 도서 적재 완료 "
+                f"(book_id={book_id}, qr_code={book_id}, target_location={target_location})"
+            )
+            return book_document
+
         except Exception as e:
             print(f"❌ [DB] 저장 오류: {e}")
             return None
 
     def get_book_by_qr(self, qr_code):
         """
-        [기능 2: QR 키에 따른 책 정보 조회 및 전송]
-        카메라가 책의 QR 코드를 인식하여 qr_code(문자열)를 넘겨주면, 
-        DB에서 해당 책 정보(제목, 크기, 무게, 목표 위치) 딕셔너리를 딱 하나 찾아 반환합니다.
+        QR 값으로 책 정보 조회.
+        Vision/QR에서 문자열 '1'로 들어와도 숫자 1로 변환해서 조회한다.
         """
-        if self.books is None: return None
-        
-        # MongoDB 내부 식별자인 _id 필드는 제외하고 약속된 데이터 형식 구조만 리턴
-        return self.books.find_one({"book_id": qr_code}, {"_id": 0})
+        if self.books is None:
+            return None
+
+        try:
+            qr_value = int(str(qr_code).strip())
+        except (TypeError, ValueError):
+            print(f"❌ [DB] QR 값이 숫자가 아닙니다: {qr_code}")
+            return None
+
+        return self.books.find_one(
+            {
+                "$or": [
+                    {"qr_code": qr_value},
+                    {"book_id": qr_value},
+                ]
+            },
+            {"_id": 0}
+        )
+
+    # ui_node.py 호환용 alias들
+    def find_book_by_qr(self, qr_code):
+        return self.get_book_by_qr(qr_code)
+
+    def find_book_by_qr_code(self, qr_code):
+        return self.get_book_by_qr(qr_code)
+
+    def get_book_by_qr_code(self, qr_code):
+        return self.get_book_by_qr(qr_code)
+
+    def find_book_by_id(self, book_id):
+        return self.get_book_by_qr(book_id)
+
+    def get_book_by_id(self, book_id):
+        return self.get_book_by_qr(book_id)
