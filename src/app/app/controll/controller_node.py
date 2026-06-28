@@ -99,7 +99,6 @@ class ControllerNode(Node):
         self.vision_qr_cli = self.create_client(Trigger, "/vision/scan_qr")
 
         self.wait_for_ui_qr_services()
-        self.test_cli()
         # Vision -> Controller
         self.create_subscription(Bool, "/vision/emergency_stop", self.handle_entry_obstacle, 10)
 
