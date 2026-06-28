@@ -227,7 +227,7 @@ class ControllerNode(Node):
             self.state = ControllerState.ERROR
             return
 
-        if res.message == "None":
+        if res.message == "QR_NOT_FOUND":
             self.finish_all_tasks()
             return
         
@@ -239,7 +239,7 @@ class ControllerNode(Node):
             return
         
         
-        self.current_session = book_data["target_location"]
+        self.current_session = int(book_data["target_location"]) - 1
 
         self.start_drl(self.current_session)
 
