@@ -600,15 +600,6 @@ class MainApp(QMainWindow):
 
         right_part.addStretch()
 
-        self.task_reset_btn = QPushButton("🔄 테스크 초기화", self)
-        self.task_reset_btn.setStyleSheet(
-            "padding: 12px; font-weight: bold; "
-            "background-color: #f5f5f5; color: #777;"
-        )
-        self.task_reset_btn.setEnabled(False)
-        self.task_reset_btn.clicked.connect(self.restart_classification_after_complete)
-        right_part.addWidget(self.task_reset_btn)
-
         reg_popup_btn = QPushButton("➕ 신규 책 등록")
         reg_popup_btn.setStyleSheet(
             "padding: 12px; font-weight: bold; "
@@ -672,9 +663,8 @@ class MainApp(QMainWindow):
             node.book_info_signal.connect(self.update_book_display)
 
         if hasattr(node, "clear_book_signal"):
-            # Controller -> UI /ui/task_complite 수신 시
-            # 현재 작업 정보를 지우고 작업 화면의 테스크 초기화 버튼을 활성화한다.
-            node.clear_book_signal.connect(self.handle_task_complete)
+            node.clear_book_signal.connect(self.handle_task_complete_reset)
+        
 
         if hasattr(node, "exception_stop_signal"):
             node.exception_stop_signal.connect(self.trigger_exception_stop)
@@ -897,7 +887,19 @@ class MainApp(QMainWindow):
     def clear_book_display(self, *args):
         self.book_info_display.setText("📖 현재 분류 중인 도서 정보 없음")
         return True
+    def handle_task_complete_reset(self, *args):
+        self.clear_book_display()
+        self.clear_camera_viewer()
 
+        if hasattr(self, "work_status_label"):
+            self.work_status_label.setText("📚 분류 작업 화면")
+
+        if self.exception_dialog is not None and self.exception_dialog.isVisible():
+            self.exception_dialog.accept()
+
+        self.stacked_widget.setCurrentIndex(0)
+        return True
+    
     def update_book_display(self, book_list):
         book_data = self.extract_book_data(book_list)
         if book_data is not None:
@@ -1079,19 +1081,8 @@ class MainApp(QMainWindow):
     def go_to_work_slide(self):
         self.clear_camera_viewer()
         self.clear_book_display()
-        self.set_task_reset_button_enabled(False)
         self.stacked_widget.setCurrentIndex(1)
 
-        self.request_classification_start(
-            return_to_start_on_fail=True,
-            keep_reset_enabled_on_fail=False
-        )
-
-    def request_classification_start(
-        self,
-        return_to_start_on_fail=False,
-        keep_reset_enabled_on_fail=True
-    ):
         sent = self.request_service(
             SystemConfig.SERVICE_SORT_REQUEST,
             {},
@@ -1104,69 +1095,7 @@ class MainApp(QMainWindow):
                 "서비스 오류",
                 "컨트롤러 cleanup_request 서비스를 호출하지 못했습니다."
             )
-
-            if return_to_start_on_fail:
-                self.stacked_widget.setCurrentIndex(0)
-
-            self.set_task_reset_button_enabled(keep_reset_enabled_on_fail)
-            return False
-
-        self.set_task_reset_button_enabled(False)
-
-        if hasattr(self, "work_status_label"):
-            self.work_status_label.setText("📚 분류 작업 진행 중")
-
-        return True
-
-    def handle_task_complete(self, *args):
-        """
-        Controller가 /ui/task_complite를 호출하면 ui_node.py에서
-        clear_book_signal을 발생시킨다.
-
-        이 신호를 받으면 작업 화면은 유지하고,
-        현재 도서/카메라 표시를 초기화한 뒤 테스크 초기화 버튼을 활성화한다.
-        """
-        self.clear_book_display()
-        self.clear_camera_viewer()
-        self.stacked_widget.setCurrentIndex(1)
-        self.set_task_reset_button_enabled(True)
-
-        if hasattr(self, "work_status_label"):
-            self.work_status_label.setText("✅ 작업 완료 - 테스크 초기화 후 분류를 재개하세요")
-
-        return True
-
-    def restart_classification_after_complete(self):
-        """
-        작업 완료 후 사용자가 테스크 초기화 버튼을 누르면
-        다시 /controller/cleanup_request를 보내 다음 분류 작업을 시작한다.
-        """
-        self.clear_camera_viewer()
-        self.clear_book_display()
-        self.request_classification_start(
-            return_to_start_on_fail=False,
-            keep_reset_enabled_on_fail=True
-        )
-
-    def set_task_reset_button_enabled(self, enabled):
-        if not hasattr(self, "task_reset_btn"):
-            return
-
-        enabled = bool(enabled)
-        self.task_reset_btn.setEnabled(enabled)
-
-        if enabled:
-            self.task_reset_btn.setText("🔄 테스크 초기화 / 분류 재개")
-            self.task_reset_btn.setStyleSheet(
-                "padding: 12px; font-weight: bold; "
-                "background-color: #e3f2fd; color: black;"
-            )
-        else:
-            self.task_reset_btn.setText("🔄 테스크 초기화")
-            self.task_reset_btn.setStyleSheet(
-                "padding: 12px; font-weight: bold; "
-                "background-color: #f5f5f5; color: #777;"
-            )
+            self.stacked_widget.setCurrentIndex(0)
 
 
 

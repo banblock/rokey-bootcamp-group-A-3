@@ -38,7 +38,7 @@ ERROR_RESPONSE_SERVICE_NAME = "/controller/error_response"
 # Controller -> UI
 UI_ERROR_NOTIFY_SERVICE_NAME = "/ui/error_notify"
 UI_TASK_COMPLETE_SERVICE_NAME = "/ui/task_complite"  # Controller 코드의 오타 이름 그대로 유지
-
+UI_BOOK_INFO_SERVICE_NAME = "/ui/book_info"
 # Camera -> UI
 CAMERA_IMAGE_TOPIC_NAME = "/camera/image_raw"
 
@@ -46,7 +46,7 @@ CAMERA_IMAGE_TOPIC_NAME = "/camera/image_raw"
 CUSTOM_SRV_MODULE = "interfaces.srv"
 UI_ERROR_RESPONSE_SRV_CLASS = "UiErrorResponse"
 UI_ERROR_NOTIFY_SRV_CLASS = "UiErrorNotify"
-
+UI_BOOK_INFO_SRV_CLASS = "UiBookInfo"
 
 # ============================================================
 # Dynamic service loading
@@ -106,7 +106,9 @@ class UINode(Node):
         self.ui_error_notify_srv_type = load_srv_type(
             UI_ERROR_NOTIFY_SRV_CLASS
         )
-
+        self.ui_book_info_srv_type = load_srv_type(
+            UI_BOOK_INFO_SRV_CLASS
+        )
         # ====================================================
         # UI -> Controller service clients
         # ====================================================
@@ -173,7 +175,19 @@ class UINode(Node):
             f"clients: {CLEANUP_REQUEST_SERVICE_NAME}, {ERROR_RESPONSE_SERVICE_NAME} / "
             f"servers: {UI_ERROR_NOTIFY_SERVICE_NAME}, {UI_TASK_COMPLETE_SERVICE_NAME}"
         )
-
+        
+        # book info
+        if self.ui_book_info_srv_type is not None:
+            self.create_service(
+                self.ui_book_info_srv_type,
+                UI_BOOK_INFO_SERVICE_NAME,
+                self.ui_book_info_service_callback
+            )
+        else:
+            self.get_logger().error(
+                f"{UI_BOOK_INFO_SERVICE_NAME} service server를 열 수 없습니다. "
+                f"{CUSTOM_SRV_MODULE}.{UI_BOOK_INFO_SRV_CLASS}가 필요합니다."
+            )
     # ========================================================
     # Public UI adapter
     # ========================================================
@@ -364,7 +378,58 @@ class UINode(Node):
         response.success = True
         response.message = "UI task complete accepted"
         return response
+    
+    def ui_book_info_service_callback(self, request, response):
+        """
+        Controller -> UI 현재 분류 도서 정보 알림.
 
+        request.key:
+            Controller가 보내는 int8 키값.
+            UI는 이 키값으로 DB에서 도서 정보를 조회하고 화면에 표시한다.
+        """
+        key = None
+
+        if hasattr(request, "key"):
+            try:
+                key = int(request.key)
+            except (TypeError, ValueError):
+                key = None
+
+        if key is None:
+            # 혹시 srv 필드명이 key가 아닌 경우를 대비한 fallback
+            key = self.extract_code(request, default=None)
+
+        if key is None:
+            self.get_logger().warning("ui_book_info request 수신 실패: key 필드 없음")
+            self.set_success_response(response, False, "key 필드가 없습니다.")
+            return response
+
+        if self.db_manager is None or getattr(self.db_manager, "books", None) is None:
+            self.get_logger().error("ui_book_info 처리 실패: DB manager가 준비되지 않았습니다.")
+            self.set_success_response(response, False, "DB manager가 준비되지 않았습니다.")
+            return response
+
+        try:
+            # 현재 DB 구조 기준: QR/key 값으로 도서 조회
+            book_data = self.db_manager.get_book_by_qr(key)
+
+        except Exception as e:
+            self.get_logger().error(f"ui_book_info DB 조회 실패: key={key}, error={e}")
+            self.set_success_response(response, False, f"DB 조회 실패: {e}")
+            return response
+
+        if not book_data:
+            self.get_logger().warning(f"ui_book_info 도서 없음: key={key}")
+            self.set_success_response(response, False, f"도서 정보를 찾을 수 없습니다: key={key}")
+            return response
+
+        self.get_logger().info(f"ui_book_info received: key={key}")
+
+        # Qt main thread 쪽으로 도서 정보 전달
+        self.book_info_signal.emit(book_data)
+
+        self.set_success_response(response, True, "UI book info accepted")
+        return response
     # ========================================================
     # Future/result helpers
     # ========================================================
