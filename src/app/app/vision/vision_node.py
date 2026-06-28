@@ -153,7 +153,7 @@ class BookVisionRosBridge(Node):
             if elapsed >= QR_SCAN_TIMEOUT_SEC:
                 self.scan_running = False
                 self.monitoring_active = False
-                response.success = False
+                response.success = True
                 response.message = "QR_NOT_FOUND"
                 self.get_logger().warning("QR 인식 timeout: QR_NOT_FOUND")
                 return response
@@ -161,7 +161,7 @@ class BookVisionRosBridge(Node):
             if self.vision is None or not self.vision.camera.is_opened():
                 self.scan_running = False
                 self.monitoring_active = False
-                response.success = False
+                response.success = True
                 response.message = "CAMERA_ERROR"
                 self.get_logger().error("QR 인식 중 카메라 오류")
                 return response
@@ -178,7 +178,7 @@ class BookVisionRosBridge(Node):
                 self.stop_vision()
                 self.scan_running = False
                 self.monitoring_active = False
-                response.success = False
+                response.success = True
                 response.message = "USER_CANCELLED"
                 return response
 
