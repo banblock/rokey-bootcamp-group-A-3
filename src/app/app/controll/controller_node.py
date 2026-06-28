@@ -221,7 +221,6 @@ class ControllerNode(Node):
             self.notify_ui_error(ERR_SYS_FAIL, f"QR request failed: {e}")
             self.state = ControllerState.ERROR
             return
-
         if not res.success:
             self.notify_ui_error(ERR_SYS_FAIL, res.message)
             self.state = ControllerState.ERROR

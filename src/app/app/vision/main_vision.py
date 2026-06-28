@@ -1,13 +1,20 @@
 import time
 
 import cv2
-
-from app.vision.camera_manager import CameraManager
-from app.vision.intrusion_detector import IntrusionDetector
-from app.vision.qr_detector import QRDetector
-from app.vision.robot_marker_detector import RobotMarkerDetector
-from app.vision.vision_state import VisionState
-from app.vision.visualizer import Visualizer
+try:
+    from app.vision.camera_manager import CameraManager
+    from app.vision.intrusion_detector import IntrusionDetector
+    from app.vision.qr_detector import QRDetector
+    from app.vision.robot_marker_detector import RobotMarkerDetector
+    from app.vision.vision_state import VisionState
+    from app.vision.visualizer import Visualizer
+except Exception as e:
+    from camera_manager import CameraManager
+    from intrusion_detector import IntrusionDetector
+    from qr_detector import QRDetector
+    from robot_marker_detector import RobotMarkerDetector
+    from vision_state import VisionState
+    from visualizer import Visualizer
 
 
 class BookVision:
@@ -20,7 +27,7 @@ class BookVision:
 
     def __init__(
         self,
-        camera_index=3,
+        camera_index=1,
         on_qr_confirmed=None,
         on_status=None,
         on_stop_required=None,
