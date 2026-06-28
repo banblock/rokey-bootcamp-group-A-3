@@ -193,14 +193,14 @@ class ControllerNode(Node):
 
         self.pause_and_notify(ERR_ENTRY_POINT_OBSTACLE, "엔트리포인트 이물질 감지")
 
-    # def handle_vision_anomaly(self, msg):
-        if not msg.data:
-            return
+    # # def handle_vision_anomaly(self, msg):
+    #     if not msg.data:
+    #         return
 
-        if self.state != ControllerState.TASK_RUNNING:
-            return
+    #     if self.state != ControllerState.TASK_RUNNING:
+    #         return
 
-        self.pause_and_notify(ERR_TASK_COLLISION_OR_MISS, "테스크 진행 중 걸림, 충돌, 놓침")
+    #     self.pause_and_notify(ERR_TASK_COLLISION_OR_MISS, "테스크 진행 중 걸림, 충돌, 놓침")
 
     # =========================
     # Main flow
@@ -232,7 +232,6 @@ class ControllerNode(Node):
             self.finish_all_tasks()
             return
         
-        # 수정 필요. db 참조 session 가져오기
         try:
             book_data = self.db_manager.get_book_by_qr(res.message)
         except Exception as e:
@@ -378,10 +377,11 @@ class ControllerNode(Node):
         if res.drl_state == DRL_STOP and self.state == ControllerState.TASK_RUNNING:
             self.on_task_complete()
 
-        elif res.drl_state == DRL_HOLD and self.state == ControllerState.TASK_RUNNING:
-            self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, "DRL HOLD state")
-            self.state = ControllerState.WAITING_UI_RESPONSE
-            self.dsr_polling_enabled = False
+        # 수정
+        # elif res.drl_state == DRL_HOLD and self.state == ControllerState.TASK_RUNNING:
+        #     self.notify_ui_error(ERR_TASK_COLLISION_OR_MISS, "DRL HOLD state")
+        #     self.state = ControllerState.WAITING_UI_RESPONSE
+        #     self.dsr_polling_enabled = False
 
     def on_robot_state(self, future):
         self.pending_robot_state = False
@@ -389,12 +389,12 @@ class ControllerNode(Node):
         try:
             res = future.result()
         except Exception as e:
-            self.notify_ui_error(ERR_ROBOT_SAFE_STOP, f"GetRobotState failed: {e}")
+            self.notify_ui_error(ERR_SYS_FAIL, f"GetRobotState failed: {e}")
             self.state = ControllerState.ERROR
             return
 
         if not res.success:
-            self.notify_ui_error(ERR_ROBOT_SAFE_STOP, "GetRobotState rejected")
+            self.notify_ui_error(ERR_SYS_FAIL, "GetRobotState rejected")
             self.state = ControllerState.ERROR
             return
 
