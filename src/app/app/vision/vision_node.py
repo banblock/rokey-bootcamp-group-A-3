@@ -1,7 +1,8 @@
 import os
 
 # OpenCV가 Qt 기반 imshow 창을 만들 때 Wayland/Gnome 환경에서 죽는 경우를 줄이기 위한 설정.
-# 반드시 main_vision 또는 cv2 import보다 먼저 설정되어야 한다.
+
+# 반드시 main_vision_node 또는 cv2 import보다 먼저 설정되어야 한다.
 os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 os.environ.setdefault("QT_QPA_FONTDIR", "/usr/share/fonts/truetype/dejavu")
 
@@ -13,7 +14,6 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
-
 from app.vision.main_vision import BookVision
 
 
@@ -35,6 +35,7 @@ class BookVisionRosBridge(Node):
     주의:
     - 이 파일은 main_vision.py를 subprocess로 실행하지 않는다.
     - main_vision.py의 BookVision 클래스를 import해서 ROS service/topic과 연결한다.
+
     - /vision/scan_qr 서비스가 호출되기 전까지 BookVision을 만들지 않으므로 카메라도 열리지 않는다.
     """
 
@@ -153,7 +154,7 @@ class BookVisionRosBridge(Node):
             if elapsed >= QR_SCAN_TIMEOUT_SEC:
                 self.scan_running = False
                 self.monitoring_active = False
-                response.success = False
+                response.success = True
                 response.message = "QR_NOT_FOUND"
                 self.get_logger().warning("QR 인식 timeout: QR_NOT_FOUND")
                 return response
@@ -161,7 +162,7 @@ class BookVisionRosBridge(Node):
             if self.vision is None or not self.vision.camera.is_opened():
                 self.scan_running = False
                 self.monitoring_active = False
-                response.success = False
+                response.success = True
                 response.message = "CAMERA_ERROR"
                 self.get_logger().error("QR 인식 중 카메라 오류")
                 return response
@@ -178,7 +179,7 @@ class BookVisionRosBridge(Node):
                 self.stop_vision()
                 self.scan_running = False
                 self.monitoring_active = False
-                response.success = False
+                response.success = True
                 response.message = "USER_CANCELLED"
                 return response
 
