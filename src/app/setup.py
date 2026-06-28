@@ -26,7 +26,8 @@ setup(
         'console_scripts': [
             'app = app.app:main',
             'controller = app.controll.controller_node:main',
-            'robot = app.robot.robot_node:main'
+            'ui = app.ui.ui_node:main',
+            'vision = app.vision.vision_node:main',
         ],
     },
 )

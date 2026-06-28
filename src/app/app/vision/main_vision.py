@@ -2,12 +2,12 @@ import time
 
 import cv2
 
-from camera_manager import CameraManager
-from intrusion_detector import IntrusionDetector
-from qr_detector import QRDetector
-from robot_marker_detector import RobotMarkerDetector
-from vision_state import VisionState
-from visualizer import Visualizer
+from app.vision.camera_manager import CameraManager
+from app.vision.intrusion_detector import IntrusionDetector
+from app.vision.qr_detector import QRDetector
+from app.vision.robot_marker_detector import RobotMarkerDetector
+from app.vision.vision_state import VisionState
+from app.vision.visualizer import Visualizer
 
 
 class BookVision:

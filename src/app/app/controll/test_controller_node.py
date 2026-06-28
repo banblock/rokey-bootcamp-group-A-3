@@ -95,13 +95,16 @@ class ControllerNode(Node):
         self.ui_task_complete_cli = self.create_client(Trigger, "/ui/task_complite")
 
         # Controller -> Vision
-        self.vision_qr_cli = self.create_client(Trigger, "/vision/request_qr")
-        self.vision_task_done_cli = self.create_client(Trigger, "/vision/task_done")
+        self.vision_qr_cli = self.create_client(Trigger, "/vision/scan_qr")
+        # self.vision_task_done_cli = self.create_client(Trigger, "/vision/task_done")
+
+        # self.wait_for_ui_qr_services()
 
         # Vision -> Controller
-        self.create_subscription(Bool, "/vision/entry_obstacle", self.handle_entry_obstacle, 10)
+        self.create_subscription(Bool, "/vision/emergency_stop", self.handle_entry_obstacle, 10)
 
-        self.monitor_timer = self.create_timer(0.5, self.poll_dsr_state)
+        # state check loop
+        # self.monitor_timer = self.create_timer(0.5, self.poll_dsr_state)
 
         self.get_logger().info("ControllerNode ready.")
 
@@ -115,6 +118,16 @@ class ControllerNode(Node):
             self.get_robot_state_cli,
             self.set_robot_mode_cli,
             self.get_last_alarm_cli,
+        ]
+
+        for cli in clients:
+            while not cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f"Waiting for service: {cli.srv_name}")
+        
+    def wait_for_ui_qr_services(self):
+        clients = [
+            self.ui_error_notify_cli,
+            self.vision_qr_cli
         ]
 
         for cli in clients:
@@ -219,8 +232,10 @@ class ControllerNode(Node):
         if res.message == "None":
             self.finish_all_tasks()
             return
-        # 수정 필요. db 참조 session 가져오기
         
+        # 수정 필요. db 참조 session 가져오기
+        book_data = self.db_manager.get_book_by_qr(res.message)
+        self.current_session = book_data["target_location"]
 
         self.start_drl(self.current_session)
 
@@ -436,7 +451,6 @@ class ControllerNode(Node):
 
         self.stop_drl()
         self.set_robot_autonomous_mode()
-        self.request_vision_task_done()
 
         self.state = ControllerState.IDLE
 
@@ -464,7 +478,6 @@ class ControllerNode(Node):
         self.state = ControllerState.IDLE
 
         self.request_ui_reset()
-        self.request_vision_task_done()
 
         self.get_logger().info("All cleanup tasks completed.")
 
@@ -495,14 +508,6 @@ class ControllerNode(Node):
 
         if not res.success:
             self.get_logger().error(f"UI notify rejected: {res.message}")
-
-    def request_vision_task_done(self):
-        if not self.vision_task_done_cli.service_is_ready():
-            self.get_logger().warn("Vision task_done service is not ready.")
-            return
-
-        future = self.vision_task_done_cli.call_async(Trigger.Request())
-        future.add_done_callback(lambda f: self.get_logger().info("Vision task_done requested."))
     
     def request_ui_reset(self):
 
@@ -511,6 +516,22 @@ class ControllerNode(Node):
             return
         future = self.ui_task_complete_cli.call_async(Trigger.Request())
         future.add_done_callback(self.on_ui_notify_done)
+
+
+    #test code
+    def test_cli(self):
+        #qr
+        if not self.vision_qr_cli.service_is_ready():
+            self.notify_ui_error(ERR_DATA_NOT_FOUND, "Vision QR service not ready")
+            self.state = ControllerState.ERROR
+            return
+
+        future_qr = self.vision_qr_cli.call_async(Trigger.Request())
+        print(future_qr.message)
+
+        #ui
+        self.notify_ui_error(ERR_ROBOT_SAFE_STOP, "GetRobotState rejected")
+
 
         
 def main():

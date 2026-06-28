@@ -25,7 +25,7 @@ class BookDatabaseManager:
 
         # QR 코드로 인쇄 및 인식될 고유 키값 생성
         book_id = f"BOOK_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
-        target_location = f"선반_{random.choice(['A', 'B', 'C'])}_{random.randint(1, 3)}단"
+        target_location = random.randint(0,3)
 
         book_document = {
             "book_id": book_id,            # QR 키값
