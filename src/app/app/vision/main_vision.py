@@ -131,7 +131,7 @@ class BookVision:
             return
 
         self.process_qr_scanning_frame(frame)
-    
+         
     def process_qr_scanning_frame(self, frame):
         """
         QR 확정 전 상태의 프레임 처리.
@@ -409,9 +409,9 @@ class BookVision:
         """
         self.publish_status("ROI_INTRUSION_ALARM", f"ROI 영역 침범 감지: {intrusion_ratio:.2%}")
 
-        # 로봇 정지까지 같이 하고 싶으면 아래 주석 해제
-        # if self.on_stop_required is not None:
-        #     self.on_stop_required(True)
+        # ROS wrapper가 연결되어 있으면 컨트롤러 쪽으로 비상정지 요청을 전달한다.
+        if self.on_stop_required is not None:
+            self.on_stop_required(True)
 
     def clear_intrusion_alarm(self):
         """
@@ -420,9 +420,9 @@ class BookVision:
         """
         self.publish_status("ROI_INTRUSION_CLEARED", "ROI 영역 침범 알람 해제")
 
-        # 로봇 정지 해제까지 같이 하고 싶으면 아래 주석 해제
-        # if self.on_stop_required is not None:
-        #     self.on_stop_required(False)
+        # 알람이 해제되었을 때도 컨트롤러 쪽으로 해제 상태를 전달한다.
+        if self.on_stop_required is not None:
+            self.on_stop_required(False)
 
     def publish_status(self, code, message):
         """
@@ -456,9 +456,6 @@ class BookVision:
         self.running = False
         self.camera.close()
         cv2.destroyAllWindows()
-
-
-# BookVisionNode = BookVision
 
 
 def main():
