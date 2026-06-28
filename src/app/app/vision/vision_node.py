@@ -1,7 +1,7 @@
 import os
 
 # OpenCV가 Qt 기반 imshow 창을 만들 때 Wayland/Gnome 환경에서 죽는 경우를 줄이기 위한 설정.
-# 반드시 main_vision_node 또는 cv2 import보다 먼저 설정되어야 한다.
+# 반드시 main_vision 또는 cv2 import보다 먼저 설정되어야 한다.
 os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 os.environ.setdefault("QT_QPA_FONTDIR", "/usr/share/fonts/truetype/dejavu")
 
@@ -17,7 +17,7 @@ from std_srvs.srv import Trigger
 from app.vision.main_vision import BookVision
 
 
-CAMERA_INDEX = 0
+CAMERA_INDEX = 2
 FRAME_RATE = 30.0
 QR_SCAN_TIMEOUT_SEC = 10.0
 
@@ -33,8 +33,8 @@ class BookVisionRosBridge(Node):
       의미: QR 인식 성공 후 이물질 감시 중 알람이 발생하면 True를 보낸다.
 
     주의:
-    - 이 파일은 main_vision_node.py를 subprocess로 실행하지 않는다.
-    - main_vision_node.py의 BookVision 클래스를 import해서 ROS service/topic과 연결한다.
+    - 이 파일은 main_vision.py를 subprocess로 실행하지 않는다.
+    - main_vision.py의 BookVision 클래스를 import해서 ROS service/topic과 연결한다.
     - /vision/scan_qr 서비스가 호출되기 전까지 BookVision을 만들지 않으므로 카메라도 열리지 않는다.
     """
 
@@ -100,7 +100,7 @@ class BookVisionRosBridge(Node):
             on_qr_confirmed=self.qr_confirmed_callback,
             on_status=self.status_callback,
             on_stop_required=self.emergency_stop_callback,
-            on_frame=None,  # main_vision_node.py 직접 실행과 동일하게 cv2.imshow 사용
+            on_frame=None,  # main_vision.py 직접 실행과 동일하게 cv2.imshow 사용
         )
 
         if not self.vision.camera.is_opened():
@@ -185,7 +185,7 @@ class BookVisionRosBridge(Node):
             if key == ord("d"):
                 self.vision.toggle_debug_masks()
 
-            # main_vision_node.py의 confirm_qr() -> qr_confirmed_callback()에서 값이 채워진다.
+            # main_vision.py의 confirm_qr() -> qr_confirmed_callback()에서 값이 채워진다.
             if self.latest_qr_data is not None:
                 qr_data = str(self.latest_qr_data)
 
@@ -232,7 +232,7 @@ class BookVisionRosBridge(Node):
         self.vision.last_frame_time = time.monotonic()
         self.vision.process_frame(frame)
 
-        # main_vision_node.py의 run()과 동일하게 OpenCV 키 입력 처리
+        # main_vision.py의 run()과 동일하게 OpenCV 키 입력 처리
         key = cv2.waitKey(1) & 0xFF
 
         if key == 27:  # ESC
