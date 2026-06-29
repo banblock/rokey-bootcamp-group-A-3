@@ -14,7 +14,6 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
-from sensor_msgs.msg import Image
 from app.vision.main_vision import BookVision
 
 
@@ -79,11 +78,6 @@ class BookVisionRosBridge(Node):
             10,
         )
 
-        self.camera_image_publisher = self.create_publisher(
-            Image,
-            "/vision/image_raw",
-            10,
-        )
         # QR 인식 성공 이후에는 이 timer가 계속 프레임을 처리하면서 이물질 감시를 수행한다.
         # scan_qr 서비스 콜백이 QR을 찾는 동안에는 timer가 별도로 프레임을 처리하지 않는다.
         self.camera_timer = self.create_timer(
@@ -179,7 +173,6 @@ class BookVisionRosBridge(Node):
 
             self.vision.last_frame_time = time.monotonic()
             self.vision.process_frame(frame)
-            self.publish_camera_frame(frame)
 
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC
@@ -214,24 +207,6 @@ class BookVisionRosBridge(Node):
         response.message = "RCLPY_SHUTDOWN"
         return response
 
-    def publish_camera_frame(self, frame):
-        try:
-            msg = Image()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.header.frame_id = "camera"
-
-            msg.height = frame.shape[0]
-            msg.width = frame.shape[1]
-            msg.encoding = "bgr8"
-            msg.is_bigendian = 0
-            msg.step = msg.width * 3
-            msg.data = frame.tobytes()
-
-            self.camera_image_publisher.publish(msg)
-
-        except Exception as e:
-            self.get_logger().error(f"camera frame publish failed: {e}")
-
     def camera_timer_callback(self):
         """
         QR 인식 성공 후 이물질 감시를 계속 수행한다.
@@ -257,7 +232,7 @@ class BookVisionRosBridge(Node):
 
         self.vision.last_frame_time = time.monotonic()
         self.vision.process_frame(frame)
-        self.publish_camera_frame(frame)
+
         # main_vision.py의 run()과 동일하게 OpenCV 키 입력 처리
         key = cv2.waitKey(1) & 0xFF
 
