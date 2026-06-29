@@ -31,8 +31,6 @@ class BookVisionRosBridge(Node):
       요청 의미: 카메라를 켜고 QR 인식을 시작한 뒤, 성공하면 QR 문자열을 서비스 응답으로 반환한다.
     - Vision -> Controller : /vision/emergency_stop 토픽 publish
       의미: QR 인식 성공 후 이물질 감시 중 알람이 발생하면 True를 보낸다.
-    - Controller -> Vision : /vision/reset_scan 서비스 호출
-      의미: DB에 없는 QR 등으로 현재 QR 결과를 무효 처리하고 QR 스캔 대기 상태로 되돌린다.
 
     주의:
     - 이 파일은 main_vision.py를 subprocess로 실행하지 않는다.
@@ -66,13 +64,6 @@ class BookVisionRosBridge(Node):
             self.scan_qr_callback,
         )
 
-        # Controller -> Vision: DB 미등록 QR 등으로 QR 인식 상태를 초기화
-        self.reset_scan_service = self.create_service(
-            Trigger,
-            "/vision/reset_scan",
-            self.reset_scan_callback,
-        )
-
         # Vision -> Controller: 이물질 알람 기반 비상정지 요청
         self.emergency_stop_publisher = self.create_publisher(
             Bool,
@@ -95,7 +86,7 @@ class BookVisionRosBridge(Node):
         )
 
         self.get_logger().info(
-            "비전 ROS bridge 시작: /vision/scan_qr, /vision/reset_scan 서비스 요청 대기 중"
+            "비전 ROS bridge 시작: /vision/scan_qr 서비스 요청 대기 중"
         )
 
     def create_vision_if_needed(self):
@@ -110,8 +101,7 @@ class BookVisionRosBridge(Node):
             on_qr_confirmed=self.qr_confirmed_callback,
             on_status=self.status_callback,
             on_stop_required=self.emergency_stop_callback,
-            # UI 영상 publish를 사용하지 않으므로 main_vision.py 직접 실행처럼 cv2.imshow 사용
-            on_frame=None,
+            on_frame=None,  # main_vision.py 직접 실행과 동일하게 cv2.imshow 사용
         )
 
         if not self.vision.camera.is_opened():
@@ -215,43 +205,6 @@ class BookVisionRosBridge(Node):
         self.monitoring_active = False
         response.success = False
         response.message = "RCLPY_SHUTDOWN"
-        return response
-
-    def reset_scan_callback(self, request, response):
-        """
-        Controller가 DB에 없는 QR이라고 판단했을 때 호출하는 초기화 서비스.
-
-        역할:
-        - 현재 QR 확정 결과를 무효 처리한다.
-        - 이물질 감시 상태를 중단한다.
-        - BookVision 내부 상태를 QR 스캔 대기 상태로 되돌린다.
-        - 이후 Controller가 /vision/scan_qr를 다시 호출하면 새 QR 인식을 시작할 수 있다.
-
-        호출 예:
-        ros2 service call /vision/reset_scan std_srvs/srv/Trigger "{}"
-        """
-        self.scan_running = False
-        self.monitoring_active = False
-        self.latest_qr_data = None
-        self.latest_qr_payload = None
-        self.last_emergency_stop = False
-
-        if self.vision is not None:
-            try:
-                self.vision.resume_scan()
-            except Exception as e:
-                response.success = False
-                response.message = f"VISION_SCAN_RESET_FAILED: {e}"
-                self.get_logger().error(response.message)
-                return response
-
-        response.success = True
-        response.message = "VISION_SCAN_RESET"
-
-        self.get_logger().info(
-            "DB 미등록 QR 처리: Vision 상태를 QR 인식 대기 상태로 초기화했습니다."
-        )
-
         return response
 
     def camera_timer_callback(self):
