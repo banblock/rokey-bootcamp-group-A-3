@@ -97,7 +97,6 @@ class ControllerNode(Node):
 
         # Controller -> Vision
         self.vision_qr_cli = self.create_client(Trigger, "/vision/scan_qr")
-        self.vision_reset_cli = self.create_client(Trigger, "/vision/reset_scan")
 
         self.wait_for_ui_qr_services()
         # Vision -> Controller
@@ -286,22 +285,22 @@ class ControllerNode(Node):
         self.dsr_polling_enabled = True
         self.get_logger().info("DRL task started.")
 
-    def vision_reset(self):
-        future = self.vision_reset_cli.call_async(Trigger.Request())
-        future.add_done_callback(self.on_vision_reset)
+    # def vision_reset(self):
+    #     future = self.vision_reset_cli.call_async(Trigger.Request())
+    #     future.add_done_callback(self.on_vision_reset)
 
-        self.get_logger().error("send reset vision scan")
+    #     self.get_logger().error("send reset vision scan")
 
-    def on_vision_reset(self, future):
+    # def on_vision_reset(self, future):
 
-        try:
-            res = future.result()
-        except Exception as e:
-            self.get_logger().error(f"reset scan failed: {e}")
-            return
+    #     try:
+    #         res = future.result()
+    #     except Exception as e:
+    #         self.get_logger().error(f"reset scan failed: {e}")
+    #         return
 
-        if not res.success:
-            self.get_logger().error(f"reset scan rejected: {res.message}")
+    #     if not res.success:
+    #         self.get_logger().error(f"reset scan rejected")
 
     # =========================
     # DSR pause / resume / stop
@@ -491,9 +490,9 @@ class ControllerNode(Node):
 
         self.stop_drl()
         self.set_robot_autonomous_mode()
-        self.vision_reset()
         
         self.state = ControllerState.IDLE
+        self.request_qr()
 
     def set_robot_autonomous_mode(self):
         req = SetRobotMode.Request()
