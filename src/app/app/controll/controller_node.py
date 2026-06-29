@@ -128,7 +128,6 @@ class ControllerNode(Node):
             self.ui_error_notify_cli,
             self.vision_qr_cli,
             self.ui_current_data_cli,
-            self.vision_reset_cli
         ]
 
         for cli in clients:
