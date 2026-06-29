@@ -1,0 +1,5 @@
+pymongo
+PyQt6
+qrcode[pil]
+opencv-python
+numpy
