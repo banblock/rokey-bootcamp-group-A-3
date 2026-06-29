@@ -27,7 +27,7 @@ class BookVision:
 
     def __init__(
         self,
-        camera_index=2,
+        camera_index=0,
         on_qr_confirmed=None,
         on_status=None,
         on_stop_required=None,
@@ -467,7 +467,7 @@ class BookVision:
 
 def main():
     """이 파일을 직접 실행했을 때 BookVision 객체를 만들고 실행한다."""
-    vision = BookVision(camera_index=2)
+    vision = BookVision(camera_index=0)
 
     try:
         vision.run()

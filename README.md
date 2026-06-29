@@ -66,9 +66,18 @@ rokey 부트캠프 프로젝트 A - 3조 레포지토리
 ros2 launch  app app_start.launch.py
 ```
 ### Step 2. [분류시작] 분류 시작 버튼을 눌러 메인 task를 실행 합니다.
+<p align="center">
+  <img src="./images/ui.png" alt="UI 이미지" width="400">
+</p>
 
 ### Step 3. [오류처리] 분류 과정 중 발생한 오류는 UI를 통해 인지하고 처리합니다.
+<p align="center">
+  <img src="./images/exception.png" alt="예외처리 이미지" width="400">
+</p>
 
 ### Step 4. [분류완료] 분류 과정이 완료되면 분류시작/초기화 버튼을 통해 task를 재시작 할 수 있습니다.
+<p align="center">
+  <img src="./images/image (2).png" alt="테스크 재시작 이미지" width="400">
+</p>
 
 ### Step 5. [종료] UI의 종료 버튼을 누르고 터미널에 프로세스를 종료합니다.

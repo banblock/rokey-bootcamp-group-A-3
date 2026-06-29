@@ -17,7 +17,7 @@ from std_srvs.srv import Trigger
 from app.vision.main_vision import BookVision
 
 
-CAMERA_INDEX = 2
+CAMERA_INDEX = 0
 FRAME_RATE = 60.0
 QR_SCAN_TIMEOUT_SEC = 10.0
 
