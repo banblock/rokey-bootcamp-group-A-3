@@ -241,7 +241,7 @@ class ControllerNode(Node):
         book_data = self.db_manager.get_book_by_qr(res.message)
         if book_data == None:
             self.notify_ui_error(ERR_DATA_NOT_FOUND, res.message)
-            self.state = ControllerState.ERROR
+            self.state = ControllerState.WAITING_UI_RESPONSE
             return
         
         self.current_session = int(book_data["target_location"]) - 1
