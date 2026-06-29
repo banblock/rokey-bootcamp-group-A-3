@@ -11,15 +11,15 @@ rokey 부트캠프 프로젝트 A - 3조 레포지토리
 
 ### 1-1. 시스템 설계도 (System Architecture)
 <p align="center">
-  <img src="./images/system_design.png" alt="시스템 설계도 이미지" width="400">
+  <img src="./images/ROKEY_PJT_A-3.png" alt="시스템 설계도 이미지" width="400">
 </p>
 * *설명: *
 
 ### 1-2. 플로우 차트 (Flow Chart)
 <p align="center">
-  <img src="./images/flow_chart.png" alt="플로우 차트 이미지" width="300" height="300">
+  <img src="./images/system_architecture.png" alt="플로우 차트 이미지" width="300" height="300">
 </p>
-* *설명: [예: UI부터 전체 프로세스 진행도를 나타냅니다.]*
+* *설명: [시스템 구조와 전체 task 흐름]*
 
 ---
 
