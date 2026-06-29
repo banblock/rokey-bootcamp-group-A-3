@@ -1013,6 +1013,31 @@ class MainApp(QMainWindow):
             if camera_frame is None:
                 self.clear_camera_viewer()
                 return
+            
+            if isinstance(camera_frame, QImage):
+                if camera_frame.isNull():
+                    self.clear_camera_viewer()
+                    return
+
+                pixmap = QPixmap.fromImage(camera_frame)
+                target_size = self.cam_view.contentsRect().size()
+
+                if target_size.width() <= 0 or target_size.height() <= 0:
+                    return
+
+                scaled_pixmap = pixmap.scaled(
+                    target_size,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+
+                self.cam_view.setText("")
+                self.cam_view.setPixmap(scaled_pixmap)
+
+                if hasattr(self, "camera_clear_timer"):
+                    self.camera_clear_timer.start()
+
+                return
 
             if not hasattr(camera_frame, "size") or camera_frame.size == 0:
                 self.clear_camera_viewer()

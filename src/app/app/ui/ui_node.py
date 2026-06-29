@@ -16,12 +16,22 @@ except Exception:
 
 try:
     from sensor_msgs.msg import Image
-    from cv_bridge import CvBridge
+    from PyQt6.QtGui import QImage
     IMAGE_STREAM_AVAILABLE = True
-except ImportError:
+except Exception as e:
+    print(f"[UI_NODE] camera stream disabled: {e}")
     Image = None
-    CvBridge = None
+    QImage = None
     IMAGE_STREAM_AVAILABLE = False
+
+# try:
+#     from sensor_msgs.msg import Image
+#     from cv_bridge import CvBridge
+#     IMAGE_STREAM_AVAILABLE = True
+# except ImportError:
+#     Image = None
+#     CvBridge = None
+#     IMAGE_STREAM_AVAILABLE = False
 
 
 SERVICE_ACCEPT = 0
@@ -155,10 +165,7 @@ class UINode(Node):
         # ====================================================
         # Camera topic subscriber
         # ====================================================
-        self.cv_bridge = None
-
         if IMAGE_STREAM_AVAILABLE:
-            self.cv_bridge = CvBridge()
             self.create_subscription(
                 Image,
                 CAMERA_IMAGE_TOPIC_NAME,
@@ -167,8 +174,24 @@ class UINode(Node):
             )
         else:
             self.get_logger().warning(
-                "sensor_msgs/cv_bridge를 불러오지 못해 카메라 스트림을 비활성화합니다."
+                "sensor_msgs/Image 또는 QImage를 불러오지 못해 카메라 스트림을 비활성화합니다."
             )
+        
+        
+        # self.cv_bridge = None
+
+        # if IMAGE_STREAM_AVAILABLE:
+        #     self.cv_bridge = CvBridge()
+        #     self.create_subscription(
+        #         Image,
+        #         CAMERA_IMAGE_TOPIC_NAME,
+        #         self.camera_image_callback,
+        #         10
+        #     )
+        # else:
+        #     self.get_logger().warning(
+        #         "sensor_msgs/cv_bridge를 불러오지 못해 카메라 스트림을 비활성화합니다."
+        #     )
 
         self.get_logger().info(
             "book_binder_ui_node started / "
@@ -602,18 +625,47 @@ class UINode(Node):
     # Camera topic
     # ========================================================
     def camera_image_callback(self, msg):
-        if self.cv_bridge is None:
-            return
-
         try:
-            frame = self.cv_bridge.imgmsg_to_cv2(
-                msg,
-                desired_encoding="bgr8"
-            )
-            self.camera_frame_signal.emit(frame)
+            if QImage is None:
+                return
+
+            if msg.encoding == "bgr8":
+                image_format = QImage.Format.Format_BGR888
+            elif msg.encoding == "rgb8":
+                image_format = QImage.Format.Format_RGB888
+            elif msg.encoding == "mono8":
+                image_format = QImage.Format.Format_Grayscale8
+            else:
+                self.get_logger().warning(f"unsupported image encoding: {msg.encoding}")
+                return
+
+            q_img = QImage(
+                bytes(msg.data),
+                msg.width,
+                msg.height,
+                msg.step,
+                image_format
+            ).copy()
+
+            self.camera_frame_signal.emit(q_img)
 
         except Exception as e:
             self.get_logger().error(f"camera image convert failed: {e}")
+
+
+    # def camera_image_callback(self, msg):
+    #     if self.cv_bridge is None:
+    #         return
+
+    #     try:
+    #         frame = self.cv_bridge.imgmsg_to_cv2(
+    #             msg,
+    #             desired_encoding="bgr8"
+    #         )
+    #         self.camera_frame_signal.emit(frame)
+
+    #     except Exception as e:
+    #         self.get_logger().error(f"camera image convert failed: {e}")
 
 
 def load_db_manager():
