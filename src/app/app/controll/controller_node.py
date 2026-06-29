@@ -237,14 +237,12 @@ class ControllerNode(Node):
         future = self.ui_current_data_cli.call_async(req)
         future.add_done_callback(self.send_book_info_ui)
 
-        try:
-            book_data = self.db_manager.get_book_by_qr(res.message)
-        except Exception as e:
+        book_data = self.db_manager.get_book_by_qr(res.message)
+        if book_data == None:
             book_data = None
             self.notify_ui_error(ERR_DATA_NOT_FOUND, res.message)
             self.state = ControllerState.ERROR
             return
-        
         
         self.current_session = int(book_data["target_location"]) - 1
 
