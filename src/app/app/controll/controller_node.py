@@ -241,7 +241,6 @@ class ControllerNode(Node):
         book_data = self.db_manager.get_book_by_qr(res.message)
         if book_data == None:
             self.notify_ui_error(ERR_DATA_NOT_FOUND, res.message)
-            self.vision_reset()
             self.state = ControllerState.ERROR
             return
         
@@ -492,7 +491,8 @@ class ControllerNode(Node):
 
         self.stop_drl()
         self.set_robot_autonomous_mode()
-
+        self.vision_reset()
+        
         self.state = ControllerState.IDLE
 
     def set_robot_autonomous_mode(self):
