@@ -1240,10 +1240,11 @@ class MainApp(QMainWindow):
             self.work_status_label.setText("🚨 비상정지 알림 표시")
 
     def update_top_bar(self, index):
-        if index in [0, 2]:
-            self.emergency_btn.hide()
-        else:
-            self.emergency_btn.show()
+        self.mergency_btn.hide()
+        # if index in [0, 2]:
+        #     self.emergency_btn.hide()
+        # else:
+        #     self.emergency_btn.show()
 
     def closeEvent(self, event):
         if hasattr(self, "camera_clear_timer"):
