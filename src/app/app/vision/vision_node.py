@@ -14,6 +14,8 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
 from app.vision.main_vision import BookVision
 
 
@@ -31,6 +33,10 @@ class BookVisionRosBridge(Node):
       요청 의미: 카메라를 켜고 QR 인식을 시작한 뒤, 성공하면 QR 문자열을 서비스 응답으로 반환한다.
     - Vision -> Controller : /vision/emergency_stop 토픽 publish
       의미: QR 인식 성공 후 이물질 감시 중 알람이 발생하면 True를 보낸다.
+    - Controller -> Vision : /vision/reset_scan 서비스 호출
+      의미: DB에 없는 QR 등으로 현재 QR 결과를 무효 처리하고 QR 스캔 대기 상태로 되돌린다.
+    - Vision -> UI : /camera/image_raw 토픽 publish
+      의미: QR 인식/이물질 감시 중 처리된 카메라 화면을 UI에 전달한다.
 
     주의:
     - 이 파일은 main_vision.py를 subprocess로 실행하지 않는다.
@@ -64,6 +70,13 @@ class BookVisionRosBridge(Node):
             self.scan_qr_callback,
         )
 
+        # Controller -> Vision: DB 미등록 QR 등으로 QR 인식 상태를 초기화
+        self.reset_scan_service = self.create_service(
+            Trigger,
+            "/vision/reset_scan",
+            self.reset_scan_callback,
+        )
+
         # Vision -> Controller: 이물질 알람 기반 비상정지 요청
         self.emergency_stop_publisher = self.create_publisher(
             Bool,
@@ -78,6 +91,15 @@ class BookVisionRosBridge(Node):
             10,
         )
 
+        # Vision -> UI: 처리된 카메라 영상을 UI로 전달
+        # ui_node.py는 /camera/image_raw를 subscribe해서 cam_view QLabel에 표시한다.
+        self.cv_bridge = CvBridge()
+        self.camera_image_publisher = self.create_publisher(
+            Image,
+            "/camera/image_raw",
+            10,
+        )
+
         # QR 인식 성공 이후에는 이 timer가 계속 프레임을 처리하면서 이물질 감시를 수행한다.
         # scan_qr 서비스 콜백이 QR을 찾는 동안에는 timer가 별도로 프레임을 처리하지 않는다.
         self.camera_timer = self.create_timer(
@@ -86,7 +108,7 @@ class BookVisionRosBridge(Node):
         )
 
         self.get_logger().info(
-            "비전 ROS bridge 시작: /vision/scan_qr 서비스 요청 대기 중"
+            "비전 ROS bridge 시작: /vision/scan_qr, /vision/reset_scan 서비스 요청 대기 중, /camera/image_raw publish 준비 완료"
         )
 
     def create_vision_if_needed(self):
@@ -101,7 +123,8 @@ class BookVisionRosBridge(Node):
             on_qr_confirmed=self.qr_confirmed_callback,
             on_status=self.status_callback,
             on_stop_required=self.emergency_stop_callback,
-            on_frame=None,  # main_vision.py 직접 실행과 동일하게 cv2.imshow 사용
+            # cv2.imshow 대신 /camera/image_raw 토픽으로 UI에 프레임을 전달한다.
+            on_frame=self.publish_camera_frame,
         )
 
         if not self.vision.camera.is_opened():
@@ -207,6 +230,43 @@ class BookVisionRosBridge(Node):
         response.message = "RCLPY_SHUTDOWN"
         return response
 
+    def reset_scan_callback(self, request, response):
+        """
+        Controller가 DB에 없는 QR이라고 판단했을 때 호출하는 초기화 서비스.
+
+        역할:
+        - 현재 QR 확정 결과를 무효 처리한다.
+        - 이물질 감시 상태를 중단한다.
+        - BookVision 내부 상태를 QR 스캔 대기 상태로 되돌린다.
+        - 이후 Controller가 /vision/scan_qr를 다시 호출하면 새 QR 인식을 시작할 수 있다.
+
+        호출 예:
+        ros2 service call /vision/reset_scan std_srvs/srv/Trigger "{}"
+        """
+        self.scan_running = False
+        self.monitoring_active = False
+        self.latest_qr_data = None
+        self.latest_qr_payload = None
+        self.last_emergency_stop = False
+
+        if self.vision is not None:
+            try:
+                self.vision.resume_scan()
+            except Exception as e:
+                response.success = False
+                response.message = f"VISION_SCAN_RESET_FAILED: {e}"
+                self.get_logger().error(response.message)
+                return response
+
+        response.success = True
+        response.message = "VISION_SCAN_RESET"
+
+        self.get_logger().info(
+            "DB 미등록 QR 처리: Vision 상태를 QR 인식 대기 상태로 초기화했습니다."
+        )
+
+        return response
+
     def camera_timer_callback(self):
         """
         QR 인식 성공 후 이물질 감시를 계속 수행한다.
@@ -242,6 +302,29 @@ class BookVisionRosBridge(Node):
 
         elif key == ord("d"):
             self.vision.toggle_debug_masks()
+
+    def publish_camera_frame(self, frame):
+        """
+        BookVision/Visualizer에서 넘어온 처리 완료 frame을 UI용 ROS Image 토픽으로 publish한다.
+
+        ui_node.py는 /camera/image_raw를 subscribe하고,
+        cv_bridge로 다시 OpenCV frame으로 변환한 뒤 PyQt signal로 ui_1.py에 전달한다.
+        """
+        if frame is None:
+            return
+
+        try:
+            image_message = self.cv_bridge.cv2_to_imgmsg(
+                frame,
+                encoding="bgr8",
+            )
+            image_message.header.stamp = self.get_clock().now().to_msg()
+            image_message.header.frame_id = "book_vision_camera"
+
+            self.camera_image_publisher.publish(image_message)
+
+        except Exception as e:
+            self.get_logger().error(f"camera frame publish failed: {e}")
 
     def qr_confirmed_callback(self, payload):
         """
