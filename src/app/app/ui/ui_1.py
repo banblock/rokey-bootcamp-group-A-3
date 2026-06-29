@@ -101,7 +101,7 @@ class SystemConfig:
         "min_d": 1.0
     }
 
-    CAMERA_WAITING_TEXT = "📷 실시간 카메라 화면\n(카메라 수신 대기 중)"
+    CAMERA_WAITING_TEXT = ""
     CAMERA_BLACK_STYLE = (
         "background-color: black; color: #aaaaaa; "
         "font-size: 14px; border: 2px solid #333;"
