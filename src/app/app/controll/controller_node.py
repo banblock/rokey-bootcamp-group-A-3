@@ -84,7 +84,6 @@ class ControllerNode(Node):
         self.get_robot_state_cli = self.create_client(GetRobotState, f"{ROBOT_NS}/system/get_robot_state")
         self.set_robot_mode_cli = self.create_client(SetRobotMode, f"{ROBOT_NS}/system/set_robot_mode")
         self.get_last_alarm_cli = self.create_client(GetLastAlarm, f"{ROBOT_NS}/system/get_last_alarm")
-
         # self.wait_for_dsr_services()
 
         # UI -> Controller
@@ -98,6 +97,7 @@ class ControllerNode(Node):
 
         # Controller -> Vision
         self.vision_qr_cli = self.create_client(Trigger, "/vision/scan_qr")
+        self.vision_reset_cli = self.create_client(Trigger, "/vision/reset_scan")
 
         self.wait_for_ui_qr_services()
         # Vision -> Controller
@@ -128,7 +128,8 @@ class ControllerNode(Node):
         clients = [
             self.ui_error_notify_cli,
             self.vision_qr_cli,
-            self.ui_current_data_cli
+            self.ui_current_data_cli,
+            self.vision_reset_cli
         ]
 
         for cli in clients:
@@ -239,8 +240,8 @@ class ControllerNode(Node):
 
         book_data = self.db_manager.get_book_by_qr(res.message)
         if book_data == None:
-            book_data = None
             self.notify_ui_error(ERR_DATA_NOT_FOUND, res.message)
+            self.vision_reset()
             self.state = ControllerState.ERROR
             return
         
@@ -285,6 +286,23 @@ class ControllerNode(Node):
         self.state = ControllerState.TASK_RUNNING
         self.dsr_polling_enabled = True
         self.get_logger().info("DRL task started.")
+
+    def vision_reset(self):
+        future = self.vision_reset_cli.call_async(Trigger.Request())
+        future.add_done_callback(self.on_vision_reset)
+
+        self.get_logger().error("send reset vision scan")
+
+    def on_vision_reset(self, future):
+
+        try:
+            res = future.result()
+        except Exception as e:
+            self.get_logger().error(f"reset scan failed: {e}")
+            return
+
+        if not res.success:
+            self.get_logger().error(f"reset scan rejected: {res.message}")
 
     # =========================
     # DSR pause / resume / stop
