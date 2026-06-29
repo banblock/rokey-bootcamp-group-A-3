@@ -12,9 +12,9 @@ def generate_launch_description():
     dsr_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
-                get_package_share_directory("dsr_bringup2"),
+                get_package_share_directory("m0609_rg2_bringup"),
                 "launch",
-                "dsr_bringup2_rviz.launch.py"
+                "bringup.launch.py"
             )
         ),
         launch_arguments={
