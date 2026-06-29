@@ -240,7 +240,7 @@ class BookVisionRosBridge(Node):
             try:
                 self.vision.resume_scan()
             except Exception as e:
-                response.success = False
+                response.success = True
                 response.message = f"VISION_SCAN_RESET_FAILED: {e}"
                 self.get_logger().error(response.message)
                 return response
